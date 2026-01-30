@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanosCC Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0f1012; color: #fff; font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .login-card { background-color: #1a1c20; border: 1px solid #2a2d35; border-radius: 16px; padding: 30px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h1 { margin: 0 0 20px 0; font-size: 24px; font-weight: 700; }
+        .info-box { background: linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0) 100%); border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin-bottom: 25px; }
+        .green-text { color: #10b981; font-weight: 600; margin-bottom: 10px; display: block; }
+        .description { font-size: 13px; color: #a1a1aa; line-height: 1.5; }
+        .telegram-wrapper { margin: 20px 0; display: flex; justify-content: center; }
+        .secure-footer { margin-top: 20px; font-size: 12px; color: #52525b; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>Welcome to NanosCC</h1>
+        <div class="info-box">
+            <span class="green-text">🛡️ Official Telegram OAuth</span>
+            <div class="description">🔒 We use Telegram's official OAuth service. No passwords, no private data accessed.</div>
+        </div>
+        <h3>Login with Telegram</h3>
+        
+        <div class="telegram-wrapper">
+            <script async src="https://telegram.org/js/telegram-widget.js?22" 
+                    data-telegram-login="deepshetAI_bot" 
+                    data-size="large" 
+                    data-radius="10" 
+                    data-auth-url="/auth"
+                    data-request-access="write"></script>
+        </div>
+        
+        <div class="secure-footer">🛡️ Secure Authentication</div>
+    </div>
+</body>
+</html>
