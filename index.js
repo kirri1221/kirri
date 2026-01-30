@@ -13,71 +13,52 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Initialize Master Bot (For Admin Alerts)
-const masterBot = new TelegramBot(process.env.MASTER_BOT_TOKEN, { polling: true });
-
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
-// In-Memory Storage (Note: Resets if server restarts)
-const userRequests = {}; 
+// Store active bots in memory
 const activeBots = {};
 
 // 1. LOGIN AUTHENTICATION (The Redirect Handler)
 app.get('/auth', (req, res) => {
     const { hash, ...data } = req.query;
-    if (!hash) return res.status(400).send('No data.');
+    
+    if (!hash) {
+        return res.status(400).send('No data received.');
+    }
 
-    const secretKey = crypto.createHash('sha256').update(process.env.MASTER_BOT_TOKEN).digest();
-    const checkString = Object.keys(data).sort().map(k => `${k}=${data[k]}`).join('\n');
-    const hmac = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
+    // Security Check: Verify the data came from Telegram
+    const secretKey = crypto.createHash('sha256')
+        .update(process.env.MASTER_BOT_TOKEN)
+        .digest();
+
+    const checkString = Object.keys(data)
+        .sort()
+        .map(k => `${k}=${data[k]}`)
+        .join('\n');
+
+    const hmac = crypto.createHmac('sha256', secretKey)
+        .update(checkString)
+        .digest('hex');
 
     if (hmac === hash) {
-        // Valid! Redirect to dashboard
+        // Valid! Redirect straight to dashboard
         const userJson = encodeURIComponent(JSON.stringify(data));
         res.redirect(`/dashboard.html?user=${userJson}`);
     } else {
-        res.status(403).send('Verification failed.');
+        res.status(403).send('Login verification failed.');
     }
 });
 
-// 2. REQUEST ACCESS
-app.post('/request-access', async (req, res) => {
-    const { telegramId, username } = req.body;
-    if (userRequests[telegramId] === 'approved') return res.json({ status: 'approved' });
-
-    userRequests[telegramId] = 'pending';
-
-    // Notify Admin via Telegram
-    try {
-        await masterBot.sendMessage(process.env.ADMIN_CHAT_ID, 
-            `⚠️ **Access Request**\nUser: @${username}\nID: ${telegramId}`, 
-            {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [[
-                        { text: "✅ Confirm", callback_data: `confirm_${telegramId}` },
-                        { text: "❌ Decline", callback_data: `decline_${telegramId}` }
-                    ]]
-                }
-            }
-        );
-        res.json({ status: 'pending' });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: "Failed to notify admin" });
-    }
-});
-
-// 3. CHECK STATUS (Polling)
-app.get('/check-status/:id', (req, res) => {
-    res.json({ status: userRequests[req.params.id] || 'none' });
-});
-
-// 4. START USER BOT
+// 2. START USER BOT (No approval check anymore)
 app.post('/start-bot', async (req, res) => {
     const { telegramId, botToken, apiKey } = req.body;
 
+    if (!botToken || !apiKey) {
+        return res.json({ message: "❌ Please enter both keys." });
+    }
+
+    // Stop existing bot if running
     if (activeBots[telegramId]) {
         try { await activeBots[telegramId].stopPolling(); } catch(e){}
     }
@@ -100,31 +81,21 @@ app.post('/start-bot', async (req, res) => {
                 });
                 await newBot.sendMessage(chatId, completion.choices[0].message.content, { parse_mode: 'Markdown' });
             } catch (err) {
+                console.error(err);
                 await newBot.sendMessage(chatId, "⚠️ AI Error: Check your API Key.");
             }
         });
 
         activeBots[telegramId] = newBot;
+        console.log(`Bot started for user ${telegramId}`);
         res.json({ message: "✅ Bot is active! Go test it." });
 
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: "❌ Failed. Check your tokens." });
     }
 });
 
-// 5. ADMIN BUTTON HANDLER
-masterBot.on('callback_query', async (query) => {
-    const [action, userId] = query.data.split('_');
-    const chatId = query.message.chat.id;
-    const msgId = query.message.message_id;
-
-    if (action === 'confirm') {
-        userRequests[userId] = 'approved';
-        await masterBot.editMessageText(`✅ User ${userId} Approved`, { chat_id: chatId, message_id: msgId });
-    } else if (action === 'decline') {
-        userRequests[userId] = 'declined';
-        await masterBot.editMessageText(`❌ User ${userId} Declined`, { chat_id: chatId, message_id: msgId });
-    }
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
-
-app.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });

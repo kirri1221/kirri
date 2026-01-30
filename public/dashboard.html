@@ -8,27 +8,27 @@
     <style>
         body { background-color: #0f1012; color: #fff; font-family: 'Inter', sans-serif; padding: 20px; text-align: center; }
         .container { max-width: 500px; margin: 40px auto; background: #1a1c20; padding: 30px; border-radius: 16px; border: 1px solid #2a2d35; }
-        input { width: 100%; padding: 12px; margin: 10px 0; background: #2a2d35; border: 1px solid #3f3f46; color: white; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn-request { background: #f59e0b; color: black; }
+        h2 { margin-bottom: 5px; }
+        .subtitle { font-size: 14px; color: #a1a1aa; margin-bottom: 25px; }
+        
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #2a2d35; border: 1px solid #3f3f46; color: white; border-radius: 8px; box-sizing: border-box; outline: none; transition: 0.2s; }
+        input:focus { border-color: #10b981; }
+        
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
         .btn-start { background: #10b981; color: black; }
-        .hidden { display: none; }
-        #status-msg { margin-top: 15px; font-size: 14px; }
+        .btn-start:hover { background: #059669; }
+        
+        #status-msg { margin-top: 20px; font-size: 14px; min-height: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2 id="welcome-msg">Welcome</h2>
+        <p class="subtitle">Configure your DeepSeek Bot below</p>
 
-        <div id="approval-section">
-            <p>You need Admin approval to use this tool.</p>
-            <button onclick="requestAccess()" class="btn-request">Request Access</button>
-        </div>
-
-        <div id="app-interface" class="hidden">
-            <h3>Configure Your Bot</h3>
-            <input type="text" id="botToken" placeholder="Paste your new Bot Token here">
-            <input type="password" id="apiKey" placeholder="Paste DeepSeek API Key here">
+        <div id="app-interface">
+            <input type="text" id="botToken" placeholder="Paste Telegram Bot Token">
+            <input type="password" id="apiKey" placeholder="Paste DeepSeek API Key">
             <button onclick="startBot()" class="btn-start">🚀 Launch Bot</button>
         </div>
 
@@ -36,54 +36,49 @@
     </div>
 
     <script>
+        // Get user data from URL
         const params = new URLSearchParams(window.location.search);
-        const user = JSON.parse(decodeURIComponent(params.get('user')));
-        document.getElementById('welcome-msg').innerText = `Hello, ${user.first_name}`;
+        const userStr = params.get('user');
         
-        let pollInterval;
-
-        // Check status immediately
-        checkStatus();
-
-        async function requestAccess() {
-            document.getElementById('status-msg').innerText = "Sending request to Admin...";
-            await fetch('/request-access', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ telegramId: user.id, username: user.username })
-            });
-            document.getElementById('status-msg').innerText = "Request Sent! Waiting for Admin confirmation...";
-            pollInterval = setInterval(checkStatus, 3000); // Check every 3 seconds
-        }
-
-        async function checkStatus() {
-            const res = await fetch(`/check-status/${user.id}`);
-            const data = await res.json();
-
-            if (data.status === 'approved') {
-                document.getElementById('approval-section').classList.add('hidden');
-                document.getElementById('app-interface').classList.remove('hidden');
-                if (pollInterval) clearInterval(pollInterval);
-                document.getElementById('status-msg').innerText = "";
-            } else if (data.status === 'declined') {
-                document.getElementById('status-msg').innerText = "Your request was declined.";
-                document.getElementById('status-msg').style.color = "red";
-                if (pollInterval) clearInterval(pollInterval);
-            }
+        if (userStr) {
+            const user = JSON.parse(decodeURIComponent(userStr));
+            document.getElementById('welcome-msg').innerText = `Hello, ${user.first_name} 👋`;
+        } else {
+            // If no user data (they didn't log in), redirect back to login
+            window.location.href = 'index.html';
         }
 
         async function startBot() {
             const botToken = document.getElementById('botToken').value;
             const apiKey = document.getElementById('apiKey').value;
-            document.getElementById('status-msg').innerText = "Starting bot...";
+            const statusLabel = document.getElementById('status-msg');
 
-            const res = await fetch('/start-bot', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ telegramId: user.id, botToken, apiKey })
-            });
-            const result = await res.json();
-            document.getElementById('status-msg').innerText = result.message;
+            if(!botToken || !apiKey) {
+                statusLabel.innerText = "Please fill in all fields.";
+                statusLabel.style.color = "#f87171";
+                return;
+            }
+
+            statusLabel.innerText = "Starting bot... please wait...";
+            statusLabel.style.color = "#a1a1aa";
+
+            // We need the Telegram ID to track the bot session
+            const user = JSON.parse(decodeURIComponent(userStr));
+
+            try {
+                const res = await fetch('/start-bot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId: user.id, botToken, apiKey })
+                });
+                const result = await res.json();
+                
+                statusLabel.innerText = result.message;
+                statusLabel.style.color = result.message.includes("Active") || result.message.includes("active") ? "#10b981" : "#f87171";
+            } catch (err) {
+                statusLabel.innerText = "Server Error. Try again.";
+                statusLabel.style.color = "#f87171";
+            }
         }
     </script>
 </body>
